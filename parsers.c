@@ -1,31 +1,19 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-int is_cmd(const char *paths)
-{
-    if (!paths)
-    {
-        // If the path is null, return -1 to indicate an error or invalid input
-        return -1;
-    }
+ int is_cmd(info_t *inf, char *paths)
+ {
+         struct stat sts;
 
-    struct stat sts;
-    if (stat(paths, &sts) != 0)
-    {
-        /* If the stat function call fails, return -2 to indicate file not
-	 accessible*/
-        return -2;
-    }
+         (void)inf;
+         if (stat(paths, &sts) || !paths)
+                 return (0);
 
-    if (S_ISREG(sts.st_mode))
-    {
-        // If the file is a regular file, return 1
-        return 1;
-    }
-
-    // If the file is not a regular file, return 0
-    return 0;
-}
+         if (sts.st_mode & S_IFREG)
+          {
+                 return (1);
+         }
+         return (0);
 
 #include <stdio.h>
 #include <stdlib.h>
