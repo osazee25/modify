@@ -1,132 +1,98 @@
-#include "shell.h"
+#include <stdio.h>
+#include <sys/stat.h>
 
-/**
- * is_cmd - determines if a file is an executable command
- * @inf: the info struct
- * @paths: path to the file
- *
- * Return: 1 if true, 0 otherwise
- */
-int is_cmd(info_t *inf, char *paths)
+int is_cmd(const char *paths)
 {
-	if (inf == NULL || paths == NULL)
-	return 0;
-	
-	struct stat sts;
-	if (stat(paths, &sts) != 0)
-	return 0;
+    if (!paths)
+    {
+        // If the path is null, return -1 to indicate an error or invalid input
+        return -1;
+    }
 
-	return S_ISREG(sts.st_mode) ? 1 : 0;
+    struct stat sts;
+    if (stat(paths, &sts) != 0)
+    {
+        /* If the stat function call fails, return -2 to indicate file not
+	 accessible*/
+        return -2;
+    }
+
+    if (S_ISREG(sts.st_mode))
+    {
+        // If the file is a regular file, return 1
+        return 1;
+    }
+
+    // If the file is not a regular file, return 0
+    return 0;
 }
 
-/**
- * dup_chars - duplicates characters
- * @pathstrr: the PATH string
- * @_start: starting index
- * @_stop: stopping index
- *
- * Return: pointer to new buffer
- */
+#include <stdio.h>
+#include <stdlib.h>
+
 char *dup_chars(char *pathstrr, int _start, int _stop)
 {
-	int x, y;
-	char *buff;
+    static char buff[1024];
+    int x = _start, y = 0;
 
-	if (pathstrr == NULL || _start >= _stop || _start < 0)
-	return NULL;
+    while (x < _stop && pathstrr[x] != ':')
+    {
+        buff[y++] = pathstrr[x++];
+    }
 
-	buff = (char *)malloc((_stop - _start + 1) * sizeof(char));
-	if (buff == NULL)
-	return NULL; /*Memory allocation failed*/
-
-	for (x = _start, y = 0; x < _stop; x++)
-	{
-	if (pathstrr[x] != ':')
-	{
-	buff[y++] = pathstrr[x];
-	}
-	}
-	buff[y] = '\0'; 
-
-	return buff;
+    buff[y] = '\0'; // Null-terminate the copied characters in buff
+    return buff;
 }
 
-/**
- * free_dup_chars - frees the buffer allocated by dup_chars
- * @buff: pointer to the buffer
- */
-void free_dup_chars(char *buff)
-{
-	free(buff);
-}
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-/**
- * find_path - finds this cmd in the PATH string
- * @inf: the info struct
- * @pathstrr: the PATH string
- * @_cmd: the cmd to find
- *
- * Return: full path of cmd if found or NULL
- */
+// Assuming _strlen, starts_with, dup_chars, and is_cmd functions are defined elsewhere...
+
 char *find_path(info_t *inf, char *pathstrr, char *_cmd)
 {
-	int cur_pos = 0;
-	char *paths = NULL;
+    int cur_pos = 0;
+    char *paths;
 
-	if (!pathstrr)
-	return NULL;
+    if (!pathstrr)
+        return NULL;
 
-	if ((_strlen(_cmd) > 2) && starts_with(_cmd, "./"))
-	{
-	if (is_cmd(inf, _cmd))
-	return _cmd;
-	}
+    // Check if _cmd starts with "./" and is executable in the current directory
+    if (_strlen(_cmd) > 2 && starts_with(_cmd, "./"))
+    {
+        if (is_cmd(inf, _cmd))
+            return _cmd;
+    }
 
-	for (int x = 0; pathstrr[x]; x++)
-	{
-	if (pathstrr[x] == ':')
-	{
-		paths = dup_chars(pathstrr, cur_pos, x);
-	/* Check if the current path is an empty string, meaning it represents
-	 the current directory*/
-		if (!*paths)
-	{
-                /* Allocate memory to hold the full path of the command*/
-	paths = (char *)malloc((_strlen(_cmd) + 3) * sizeof(char)); // +3 for './' and '\0'
-	if (paths == NULL)
-	return NULL; /* Memory allocation failed*/
+    for (int x = 0; ; x++)
+    {
+        if (!pathstrr[x] || pathstrr[x] == ':')
+        {
+            // Extract the path segment from pathstrr
+            paths = dup_chars(pathstrr, cur_pos, x);
 
-                /* Copy "./" and the command name to the paths buffer*/
-		_strcpy(paths, "./");
-		_strcat(paths, _cmd);
-	}
-	else
-	{
-	/*Allocate memory to hold the full path of the command*/
-	paths = (char *)malloc((_strlen(paths) + _strlen(_cmd) + 2)
-	 * sizeof(char));
-	
-	if (paths == NULL)
-	return NULL; /* Memory allocation failed*/
+            // Concatenate the path with _cmd
+            if (!*paths)
+                _strcat(paths, _cmd);
+            else
+            {
+                _strcat(paths, "/");
+                _strcat(paths, _cmd);
+            }
 
-	/* Concatenate the current path, '/', and the command name to the paths 
-	buffer*/
-		_strcpy(paths, paths);
-		_strcat(paths, "/");
-		_strcat(paths, _cmd);
-	}
+            // Check if the combined path exists and is executable
+            if (is_cmd(inf, paths))
+                return paths;
 
-	/* Check if the concatenated path is an executable command*/
-	if (is_cmd(inf, paths))
-	return paths;
+            // If we reached the end of pathstrr, exit the loop
+            if (!pathstrr[x])
+                break;
 
-	/* Free the memory allocated for the paths buffer*/
-	free(paths);
+            // Move to the next path segment
+            cur_pos = x + 1;
+        }
+    }
 
-	/* Move to the next position in the PATH string*/
-	cur_pos = x + 1;
-	}
-	}
-
-	return NULL; /* Command not found in the PATH string*/
-	}
+    return NULL; // The _cmd was not found in any of the directories
+}
